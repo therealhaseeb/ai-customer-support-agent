@@ -1,0 +1,29 @@
+# -----------------------------
+# FastAPI / Web
+# -----------------------------
+fastapi
+uvicorn[standard]
+
+# -----------------------------
+# Database / ORM
+# -----------------------------
+SQLAlchemy
+pydantic
+databases
+
+# -----------------------------
+# LLM / Embeddings
+# -----------------------------
+sentence-transformers
+pinecone-client
+google-generativeai
+
+# -----------------------------
+# PDF / RAG
+# -----------------------------
+PyPDF2
+
+# -----------------------------
+# Logging / Utilities
+# -----------------------------
+python-dotenv
