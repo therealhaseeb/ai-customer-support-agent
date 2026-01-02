@@ -1,5 +1,5 @@
 from typing import List
-import google.generativeai as genai
+from google import genai
 from app.config import get_settings
 from app.services.logger import logger
 
@@ -16,14 +16,12 @@ def _init_gemini_client():
     """
     if not settings.GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not set in .env")
-    
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    logger.info("Gemini client configured")
-    return genai
+
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    return client
 
 # Initialize once
 _gemini = _init_gemini_client()
-
 
 # -------------------------------------------------------------------
 # LLM Client Wrapper
@@ -49,14 +47,8 @@ class LLMClient:
         logger.info(f"LLM request to model={self.model_name}")
 
         response = _gemini.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            # Control response randomness & length
-            config={
-                "temperature": temperature,
-                "maxOutputTokens": max_output_tokens,
-            },
-        )
+                            model="gemini-2.5-flash", 
+                            contents="Explain how AI works in a few words")
 
         # The SDK may return multiple text segments
         # Join them (simple case)
@@ -81,4 +73,11 @@ class LLMClient:
             contents=messages,
             config={
                 "temperature": temperature,
-                "maxOutputTokens": max_ou_
+                "maxOutputTokens": max_output_tokens,
+            },
+        )
+
+        # Extract response text
+        text = response.text if hasattr(response, "text") else ""
+        logger.info("LLM chat response received")
+        return text

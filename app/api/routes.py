@@ -1,48 +1,78 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from app.api import schemas
-from app.db.database import get_db
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from app.services.llm import LLMClient
-from app.agent.agent import CustomerSupportAgent
-from app.services.logger import logger
+from app.services.vector_store import VectorStore
+from app.db import crud, database
 
 router = APIRouter()
 
-# Mock tools dictionary (replace with real tool calls)
-def mock_order_tool():
-    return {"order_id": 1, "status": "shipped"}
+# ------------------------
+# Request model
+# ------------------------
+class QueryRequest(BaseModel):
+    user_id: int
+    query: str
 
-def mock_refund_tool():
-    return {"order_id": 1, "refunded": True}
-
-TOOLS = {
-    "order_tool": mock_order_tool,
-    "refund_tool": mock_refund_tool
-}
-
-# Instantiate LLM and agent
+# ------------------------
+# Initialize LLM and RAG
+# ------------------------
 llm = LLMClient()
-agent = CustomerSupportAgent(llm)
+vector_search = VectorStore()  # Make sure this works with your Pinecone VectorStore
 
+# ------------------------
+# /api/query endpoint
+# ------------------------
+@router.post("/query")
+def query_agent(request: QueryRequest):
+    # Validate user exists
+    db = database.SessionLocal()
+    user = crud.get_user(db, request.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-@router.post("/query", response_model=schemas.QueryResponse)
-def handle_query(request: schemas.QueryRequest, db: Session = Depends(get_db)):
-    """
-    Endpoint to send user queries to AI agent.
-    """
+    # ------------------------
+    # Step 1 — Retrieve relevant policy text using RAG
+    # ------------------------
+    docs = vector_search.query(request.query, top_k=3)  # returns list of text
+    context_text = "\n".join(docs) if docs else "No relevant policy found."
+
+    # ------------------------
+    # Step 2 — Construct prompt for LLM
+    # ------------------------
+    prompt = f"""
+You are an AI customer support agent.
+User Question: {request.query}
+Context / Policy Info: {context_text}
+
+Answer concisely, and suggest refund eligibility if applicable.
+"""
+
+    # ------------------------
+    # Step 3 — Get LLM response
+    # ------------------------
     try:
-        result = agent.handle_query(user_id=request.user_id, query=request.query, tools=TOOLS)
-        # Convert tool outputs
-        tool_outputs = []
-        for step in result["state"]:
-            if step["tool"]:
-                tool_outputs.append(schemas.ToolOutput(tool=step["tool"], result=step.get("input")))
-        return schemas.QueryResponse(
-            response=result.get("response"),
-            escalate=result.get("escalate", False),
-            tool_outputs=tool_outputs,
-            conversation_state=result["state"]
-        )
+        answer = llm.generate_text(prompt)
     except Exception as e:
-        logger.error(f"Agent API error: {e}")
-        return schemas.QueryResponse(response=str(e), escalate=True)
+        # In case LLM fails, escalate
+        answer = f"Error generating answer: {str(e)}"
+        return {
+            "user_id": request.user_id,
+            "query": request.query,
+            "response": answer,
+            "escalate": True,
+            "tool_outputs": [],
+            "conversation_state": []
+        }
+
+    # ------------------------
+    # Step 4 — Return structured response
+    # ------------------------
+    return {
+        "user_id": request.user_id,
+        "query": request.query,
+        "response": answer,
+        "retrieved_docs": docs,
+        "escalate": False,
+        "tool_outputs": [],
+        "conversation_state": []
+    }

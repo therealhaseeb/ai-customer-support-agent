@@ -11,6 +11,8 @@ def get_user(db: Session, user_id: int):
 
 def create_user(db: Session, name: str, email: str):
     user = models.User(name=name, email=email)
+    if user:
+        return user
     db.add(user)
     db.commit()
     db.refresh(user)

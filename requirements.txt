@@ -9,19 +9,21 @@ uvicorn[standard]
 # -----------------------------
 SQLAlchemy
 pydantic
+pydantic-settings
 databases
 
 # -----------------------------
 # LLM / Embeddings
 # -----------------------------
 sentence-transformers
-pinecone-client
-google-generativeai
+pinecone
+google-ai
 
 # -----------------------------
 # PDF / RAG
 # -----------------------------
 PyPDF2
+fpdf
 
 # -----------------------------
 # Logging / Utilities

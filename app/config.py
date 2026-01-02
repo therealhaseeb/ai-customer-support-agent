@@ -1,4 +1,4 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 
@@ -9,11 +9,12 @@ class Settings(BaseSettings):
 
     # LLM
     GEMINI_API_KEY: str | None = None
-    LLM_MODEL: str = "gemini-1.5-pro"
+    LLM_MODEL: str = "gemini-2.5-flash-lite"
 
     # Vector DB
     PINECONE_API_KEY: str | None = None
-    PINECONE_INDEX_NAME: str = "support-policies"
+    PINECONE_INDEX_NAME: str | None = None
+    PINECONE_ENVIRONMENT: str = "us-east-1"
 
     # Database
     DATABASE_URL: str = "sqlite:///./support.db"
